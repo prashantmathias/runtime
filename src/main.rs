@@ -64,9 +64,9 @@ extension!(
 #[derive(Parser)]
 #[command(name = "runtime")]
 #[command(version = "0.1.0")]
-#[command(about = "A custom JavaScript runtime built in Rust and V8", long_about = None)]
+#[command(about = "A custom JavaScript/TypeScript runtime built in Rust and V8", long_about = None)]
 struct Cli {
-    /// The path to the JavaScript file to execute. If omitted, starts the REPL.
+    /// The path to the JavaScript/TypeScript file to execute. If omitted, starts the REPL.
     file: Option<String>,
 }
 
@@ -77,6 +77,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.file {
         Some(file) => {
             let code = fs::read_to_string(&file)?;
+            
+            // Transpile TypeScript if the file ends with .ts or .tsx
+            let code = if file.ends_with(".ts") || file.ends_with(".tsx") {
+                transpile_ts(&code, &file)?
+            } else {
+                code
+            };
 
             let mut runtime = JsRuntime::new(RuntimeOptions {
                 extensions: vec![runtime::init()],
@@ -94,6 +101,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn transpile_ts(code: &str, file_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let media_type = if file_name.ends_with(".tsx") {
+        deno_ast::MediaType::Tsx
+    } else if file_name.ends_with(".ts") {
+        deno_ast::MediaType::TypeScript
+    } else {
+        deno_ast::MediaType::JavaScript
+    };
+
+    let specifier = deno_ast::ModuleSpecifier::parse(&format!("file:///{}", file_name))?;
+
+    let parsed = deno_ast::parse_module(deno_ast::ParseParams {
+        specifier,
+        text: std::sync::Arc::from(code),
+        media_type,
+        capture_tokens: false,
+        scope_analysis: false,
+        maybe_syntax: None,
+    })?;
+
+    let transpiled = parsed.transpile(
+        &deno_ast::TranspileOptions::default(),
+        &Default::default(),
+        &Default::default(),
+    )?;
+    
+    let js_code = transpiled.into_source().text;
+    Ok(js_code)
+}
+
 async fn run_repl() -> Result<(), Box<dyn std::error::Error>> {
     let mut runtime = JsRuntime::new(RuntimeOptions {
         extensions: vec![runtime::init()],
@@ -102,7 +139,7 @@ async fn run_repl() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut input = String::new();
 
-    println!("Welcome to Custom JS Runtime REPL!");
+    println!("Welcome to Custom JS/TS Runtime REPL!");
     println!("Type 'exit' or 'quit' to exit.");
 
     loop {
@@ -124,8 +161,17 @@ async fn run_repl() -> Result<(), Box<dyn std::error::Error>> {
             continue;
         }
 
+        // Transpile input in case it contains TypeScript syntax
+        let js_input = match transpile_ts(trimmed, "repl.ts") {
+            Ok(js) => js,
+            Err(err) => {
+                eprintln!("Transpile Error: {}", err);
+                continue;
+            }
+        };
+
         // Evaluate input
-        match runtime.execute_script("repl", input.clone()) {
+        match runtime.execute_script("repl", js_input) {
             Ok(value) => {
                 let context_global = runtime.main_context();
                 let scope_storage = deno_core::v8::HandleScope::new(runtime.v8_isolate());
