@@ -1,0 +1,9 @@
+[package]
+name = "runtime"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.6.1", features = ["derive"] }
+deno_core = "0.404.0"
+tokio = { version = "1.52.3", features = ["full"] }
