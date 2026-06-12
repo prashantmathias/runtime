@@ -1,1 +1,1 @@
-Async runtime test data: 0.362652596806746
+Async runtime test data: 0.06466069896973126

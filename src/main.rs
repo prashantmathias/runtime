@@ -6,7 +6,7 @@ use deno_core::op2;
 use deno_core::JsRuntime;
 use deno_core::RuntimeOptions;
 use tokio::fs as tokio_fs;
-use clap::{Parser, Subcommand};
+use clap::Parser;
 
 #[op2(fast)]
 fn op_custom_print(#[string] msg: &str, is_err: bool) {
@@ -66,27 +66,16 @@ extension!(
 #[command(version = "0.1.0")]
 #[command(about = "A custom JavaScript runtime built in Rust and V8", long_about = None)]
 struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    /// Execute a JavaScript file
-    Run {
-        /// The path to the JavaScript file to execute
-        file: String,
-    },
-    /// Start an interactive REPL
-    Repl,
+    /// The path to the JavaScript file to execute. If omitted, starts the REPL.
+    file: Option<String>,
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
-    match cli.command {
-        Commands::Run { file } => {
+    match cli.file {
+        Some(file) => {
             let code = fs::read_to_string(&file)?;
 
             let mut runtime = JsRuntime::new(RuntimeOptions {
@@ -97,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             runtime.execute_script(file, code)?;
             runtime.run_event_loop(Default::default()).await?;
         }
-        Commands::Repl => {
+        None => {
             run_repl().await?;
         }
     }
