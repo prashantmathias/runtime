@@ -26,11 +26,15 @@ pub type JSValueRef = *const OpaqueJSValue;
 pub type JSObjectRef = *mut OpaqueJSValue;
 pub type JSChar = u16;
 pub type JSPropertyAttributes = u32;
+pub type JSTypedArrayType = u32;
 
 pub const kJSPropertyAttributeNone: JSPropertyAttributes = 0;
 pub const kJSPropertyAttributeReadOnly: JSPropertyAttributes = 1 << 1;
 pub const kJSPropertyAttributeDontEnum: JSPropertyAttributes = 1 << 2;
 pub const kJSPropertyAttributeDontDelete: JSPropertyAttributes = 1 << 3;
+
+pub const kJSTypedArrayTypeUint8Array: JSTypedArrayType = 3;
+pub const kJSTypedArrayTypeNone: JSTypedArrayType = 10;
 
 pub type JSObjectCallAsFunctionCallback = Option<
     unsafe extern "C" fn(
@@ -127,6 +131,29 @@ unsafe extern "C" {
         arguments: *const JSValueRef,
         exception: *mut JSValueRef,
     ) -> JSValueRef;
+
+    // Typed arrays
+    pub fn JSValueGetTypedArrayType(
+        ctx: JSContextRef,
+        value: JSValueRef,
+        exception: *mut JSValueRef,
+    ) -> JSTypedArrayType;
+    pub fn JSObjectMakeTypedArray(
+        ctx: JSContextRef,
+        array_type: JSTypedArrayType,
+        length: usize,
+        exception: *mut JSValueRef,
+    ) -> JSObjectRef;
+    pub fn JSObjectGetTypedArrayBytesPtr(
+        ctx: JSContextRef,
+        object: JSObjectRef,
+        exception: *mut JSValueRef,
+    ) -> *mut u8;
+    pub fn JSObjectGetTypedArrayByteLength(
+        ctx: JSContextRef,
+        object: JSObjectRef,
+        exception: *mut JSValueRef,
+    ) -> usize;
 }
 
 /// Owned `JSStringRef`, released on drop.
@@ -247,5 +274,51 @@ pub unsafe fn set_function(
         let js_name = JsString::new(name);
         let func = JSObjectMakeFunctionWithCallback(ctx, js_name.as_raw(), callback);
         set_property(ctx, object, name, func);
+    }
+}
+
+/// Creates a JS `Uint8Array` copying `bytes`.
+///
+/// # Safety
+/// `ctx` must be valid.
+pub unsafe fn make_uint8_array(ctx: JSContextRef, bytes: &[u8]) -> JSObjectRef {
+    unsafe {
+        let arr = JSObjectMakeTypedArray(ctx, kJSTypedArrayTypeUint8Array, bytes.len(), ptr::null_mut());
+        if !arr.is_null() && !bytes.is_empty() {
+            let dst = JSObjectGetTypedArrayBytesPtr(ctx, arr, ptr::null_mut());
+            if !dst.is_null() {
+                ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
+            }
+        }
+        arr
+    }
+}
+
+/// Copies the bytes of a JS TypedArray (e.g. `Uint8Array`) into a `Vec<u8>`.
+///
+/// # Safety
+/// `ctx` and `value` must be valid.
+pub unsafe fn read_uint8_array(ctx: JSContextRef, value: JSValueRef) -> Option<Vec<u8>> {
+    unsafe {
+        if value.is_null() || !JSValueIsObject(ctx, value) {
+            return None;
+        }
+        let ty = JSValueGetTypedArrayType(ctx, value, ptr::null_mut());
+        if ty == kJSTypedArrayTypeNone {
+            return None;
+        }
+        let obj = JSValueToObject(ctx, value, ptr::null_mut());
+        if obj.is_null() {
+            return None;
+        }
+        let len = JSObjectGetTypedArrayByteLength(ctx, obj, ptr::null_mut());
+        if len == 0 {
+            return Some(Vec::new());
+        }
+        let ptr = JSObjectGetTypedArrayBytesPtr(ctx, obj, ptr::null_mut());
+        if ptr.is_null() {
+            return Some(Vec::new());
+        }
+        Some(std::slice::from_raw_parts(ptr, len).to_vec())
     }
 }

@@ -36,13 +36,7 @@ async fn main() {
 
 async fn run_file(file: &str) -> Result<(), Box<dyn std::error::Error>> {
     let code = fs::read_to_string(file)?;
-
-    // Transpile TypeScript if the file ends with .ts or .tsx
-    let code = if file.ends_with(".ts") || file.ends_with(".tsx") {
-        transpile_ts(&code, file)?
-    } else {
-        code
-    };
+    let code = transpile_ts(&code, file)?;
 
     let mut runtime = Runtime::new()?;
     runtime.execute_script(file, &code)?;

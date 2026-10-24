@@ -1,0 +1,7 @@
+{
+  "name": "runtime-tests",
+  "private": true,
+  "dependencies": {
+    "hono": "^4.13.13"
+  }
+}

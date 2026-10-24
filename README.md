@@ -116,6 +116,10 @@ The Read-Eval-Print Loop (REPL) keeps a single `Runtime` instance alive across l
     ```powershell
     cargo run -- tests/ts_test.ts
     ```
+    ```powershell
+    npm install
+    cargo run -- tests/hono_ws_test.ts
+    ```
 3.  **Check CLI usage & help options**:
     ```powershell
     cargo run -- --help
