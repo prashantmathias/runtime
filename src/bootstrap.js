@@ -1,4 +1,7 @@
 // src/bootstrap.js
+// Evaluated by the runtime as a function expression and invoked with the
+// native ops object (JavaScriptCore host functions defined in runtime.rs).
+(function (ops) {
 const {
     op_custom_print,
     op_sleep,
@@ -6,7 +9,7 @@ const {
     op_fs_write_file_sync,
     op_fs_read_file_async,
     op_fs_write_file_async
-} = Deno.core.ops;
+} = ops;
 
 globalThis.console = {
     log(...args) {
@@ -47,3 +50,4 @@ globalThis.fs = {
         return op_fs_write_file_async(path, contents);
     }
 };
+})

@@ -1,0 +1,8 @@
+# Bun's prebuilt JavaScriptCore for Windows is compiled against the static CRT
+# (/MT, RuntimeLibrary=MT_StaticRelease), so Rust must match or MSVC's linker
+# will reject the mismatched objects.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
